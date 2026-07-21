@@ -1,84 +1,112 @@
-import os
-import glob
-from tkinter import Tk, filedialog, messagebox
+from fasthtml.common import *
 import pandas as pd
 
+# 1. Khởi tạo ứng dụng FastHTML
+app, rt = fast_app(hdrs=(picolink,))
 
-def gop_file_excel():
-    root = Tk()
-    root.withdraw()
-    root.attributes("-topmost", True)
+# 2. Đọc và chuẩn hóa dữ liệu Excel
+EXCEL_FILE = "danh_sach_don_vi.xlsx"
 
-    # 1. Chọn thư mục nguồn
-    thu_muc_nguon = filedialog.askdirectory(
-        title="Chọn thư mục chứa các file Excel cần gộp"
-    )
-    if not thu_muc_nguon:
-        messagebox.showwarning("Thông báo", "Bạn chưa chọn thư mục nào!")
-        return
-
-    # 2. Tìm danh sách file
-    danh_sach_file = (
-        glob.glob(os.path.join(thu_muc_nguon, "*.xlsx"))
-        + glob.glob(os.path.join(thu_muc_nguon, "*.xls"))
-        + glob.glob(os.path.join(thu_muc_nguon, "*.csv"))
-    )
-
-    if not danh_sach_file:
-        messagebox.showerror(
-            "Lỗi", "Không tìm thấy file Excel hoặc CSV nào trong thư mục này!"
-        )
-        return
-
-    # 3. Chọn nơi lưu file kết quả
-    file_output = filedialog.asksaveasfilename(
-        title="Chọn nơi lưu file kết quả",
-        defaultextension=".xlsx",
-        filetypes=[("Excel Files", "*.xlsx")],
-        initialfile="File_Gop_Tong_Hop.xlsx",
-    )
-    if not file_output:
-        messagebox.showwarning("Thông báo", "Bạn đã hủy chọn nơi lưu file!")
-        return
-
-    # Danh sách để lưu lại vết các file đã gộp thành công nhằm hiển thị thông báo chi tiết
-    cac_file_da_gop = []
-
-    # 4. Tiến hành gộp dữ liệu
+def load_data():
     try:
-        with pd.ExcelWriter(file_output, engine="openpyxl") as writer:
-            for duong_dan_file in danh_sach_file:
-                ten_file = os.path.basename(duong_dan_file)
-                ten_sheet = os.path.splitext(ten_file)[0]
-                ten_sheet = "".join(
-                    c for c in ten_sheet if c not in r"\/*?:[]"
-                )[:31]
-
-                # Đọc dữ liệu dạng chữ (dtype=str) để giữ nguyên số 0 ở đầu
-                if duong_dan_file.endswith(".csv"):
-                    df = pd.read_csv(
-                        duong_dan_file, encoding="utf-8-sig", dtype=str
-                    )
-                else:
-                    df = pd.read_excel(duong_dan_file, dtype=str)
-
-                df.to_excel(writer, sheet_name=ten_sheet, index=False)
-
-                # --- Đã khôi phục dòng thông báo chi tiết trên Terminal ---
-                thong_bao = f"Đã gộp file: {ten_file} -> Sheet: {ten_sheet}"
-                print(thong_bao)
-                cac_file_da_gop.append(thong_bao)
-
-        # Tạo nội dung thông báo chi tiết cho hộp thoại popup cuối cùng
-        chi_tiet_ket_qua = "\n".join(cac_file_da_gop)
-        messagebox.showinfo(
-            "Thành công",
-            f"Đã gộp thành công vào file:\n{file_output}\n\nChi tiết các sheet đã tạo:\n{chi_tiet_ket_qua}",
-        )
-
+        df = pd.read_excel(EXCEL_FILE)
+        return df.fillna("").astype(str)
     except Exception as e:
-        messagebox.showerror("Lỗi hệ thống", f"Đã xảy ra lỗi khi xử lý:\n{str(e)}")
+        print(f"Lỗi đọc file Excel: {e}")
+        return pd.DataFrame(columns=[
+            "MA_DONVI", "TEN_DONVI", "DC_LIEN_HE", 
+            "MS_THUE", "DIEN_THOAI_NLH", "NGAY_TANG", 
+            "CHUYEN_QUAN_THU", "DIEN_THOAI_CQT"
+        ])
 
+df = load_data()
 
-if __name__ == "__main__":
-    gop_file_excel()
+# 3. Render bảng hiển thị kết quả
+def render_results(results):
+    if results.empty:
+        return Article(P("⚠️ Không tìm thấy kết quả phù hợp.", style="color: orange;"))
+    
+    rows = []
+    for _, row in results.iterrows():
+        rows.append(
+            Tr(
+                Td(B(row.get('MA_DONVI', ''))),
+                Td(row.get('TEN_DONVI', '')),
+                Td(row.get('DC_LIEN_HE', '')),
+                Td(row.get('MS_THUE', '')),
+                Td(row.get('DIEN_THOAI_NLH', '')),
+                Td(row.get('NGAY_TANG', '')),
+                Td(row.get('CHUYEN_QUAN_THU', '')),
+                Td(row.get('DIEN_THOAI_CQT', ''))
+            )
+        )
+    
+    return Div(
+        P(f"✅ Tìm thấy {len(results)} kết quả (hiển thị tối đa 20):", style="color: green; font-weight: bold;"),
+        Div(
+            Table(
+                Thead(
+                    Tr(
+                        Th("Mã đơn vị"), 
+                        Th("Tên đơn vị"), 
+                        Th("Địa chỉ liên hệ"), 
+                        Th("Mã số thuế"),
+                        Th("SĐT NLH"),
+                        Th("Ngày tăng"),
+                        Th("Chuyên quản thu"),
+                        Th("SĐT CQT")
+                    )
+                ),
+                Tbody(*rows)
+            ),
+            style="overflow-x: auto;"
+        )
+    )
+
+# 4. Giao diện trang chủ
+@rt("/")
+def get():
+    return Titled(
+        "🔍 Tra cứu thông tin đơn vị",
+        Main(
+            Article(
+                H3("Nhập thông tin cần tìm"),
+                P("Tìm theo Mã đơn vị, Tên, Địa chỉ, MST, SĐT, Chuyên quản hoặc SĐT CQT:"),
+                Input(
+                    type="search",
+                    name="query",
+                    placeholder="Nhập từ khóa tìm kiếm...",
+                    hx_post="/search",
+                    hx_trigger="keyup changed delay:250ms",
+                    hx_target="#result-area"
+                )
+            ),
+            Div(id="result-area"),
+            cls="container"
+        )
+    )
+
+# 5. Xử lý logic tìm kiếm
+@rt("/search")
+def post(query: str):
+    query_str = query.strip().lower()
+    
+    if not query_str:
+        return Div()
+    
+    mask = (
+        df['MA_DONVI'].str.lower().str.contains(query_str) |
+        df['TEN_DONVI'].str.lower().str.contains(query_str) |
+        df['DC_LIEN_HE'].str.lower().str.contains(query_str) |
+        df['MS_THUE'].str.lower().str.contains(query_str) |
+        df['DIEN_THOAI_NLH'].str.lower().str.contains(query_str) |
+        df['CHUYEN_QUAN_THU'].str.lower().str.contains(query_str)
+    )
+    
+    if 'DIEN_THOAI_CQT' in df.columns:
+        mask = mask | df['DIEN_THOAI_CQT'].str.lower().str.contains(query_str)
+
+    filtered_df = df[mask].head(20)
+    return render_results(filtered_df)
+
+serve()

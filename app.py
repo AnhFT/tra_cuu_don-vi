@@ -2,7 +2,7 @@ from fasthtml.common import *
 import pandas as pd
 
 # 1. Khởi tạo app (Bắt buộc phải gán biến app)
-app, rt = fast_app(hdrs=(picolink,))
+app, rt = fast_app(pico=True)
 
 EXCEL_FILE = "danh_sach_don_vi.xlsx"
 

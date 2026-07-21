@@ -1,10 +1,9 @@
 from fasthtml.common import *
 import pandas as pd
 
-# 1. Khởi tạo ứng dụng FastHTML
+# 1. Khởi tạo app (Bắt buộc phải gán biến app)
 app, rt = fast_app(hdrs=(picolink,))
 
-# 2. Đọc và chuẩn hóa dữ liệu Excel
 EXCEL_FILE = "danh_sach_don_vi.xlsx"
 
 def load_data():
@@ -21,7 +20,6 @@ def load_data():
 
 df = load_data()
 
-# 3. Render bảng hiển thị kết quả
 def render_results(results):
     if results.empty:
         return Article(P("⚠️ Không tìm thấy kết quả phù hợp.", style="color: orange;"))
@@ -63,7 +61,6 @@ def render_results(results):
         )
     )
 
-# 4. Giao diện trang chủ
 @rt("/")
 def get():
     return Titled(
@@ -86,7 +83,6 @@ def get():
         )
     )
 
-# 5. Xử lý logic tìm kiếm
 @rt("/search")
 def post(query: str):
     query_str = query.strip().lower()
@@ -109,4 +105,6 @@ def post(query: str):
     filtered_df = df[mask].head(20)
     return render_results(filtered_df)
 
-serve()
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)

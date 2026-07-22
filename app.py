@@ -6,15 +6,33 @@ app, rt = fast_app(pico=True)
 
 EXCEL_FILE = "danh_sach_don_vi.xlsx"
 
+def clean_phone(val):
+    """Hàm làm sạch số điện thoại: xóa .0 và thêm số 0 ở đầu nếu bị mất"""
+    val = str(val).strip()
+    if val.endswith('.0'):
+        val = val[:-2]
+    if val and val != "nan" and not val.startswith('0') and len(val) in [9, 10]:
+        val = '0' + val
+    return "" if val == "nan" else val
+
 def load_data():
     try:
-        df = pd.read_excel(EXCEL_FILE)
-        return df.fillna("").astype(str)
+        # Ép đọc toàn bộ dữ liệu Excel dưới dạng chuỗi (String)
+        df = pd.read_excel(EXCEL_FILE, dtype=str)
+        df = df.fillna("")
+        
+        # Làm sạch riêng cho các cột Số điện thoại và Mã số thuế
+        phone_cols = ['DIEN_THOAI_NLH', 'DIEN_THOAI_CQT', 'MS_THUE']
+        for col in phone_cols:
+            if col in df.columns:
+                df[col] = df[col].apply(clean_phone)
+                
+        return df
     except Exception as e:
         print(f"Lỗi đọc file Excel: {e}")
         return pd.DataFrame(columns=[
-            "MA_DONVI", "TEN_DONVI", "DC_LIEN_HE", 
-            "MS_THUE", "DIEN_THOAI_NLH", "NGAY_TANG", 
+            "MA_DONVI", "TEN_DONVI", "DC_LIEN_HE",
+            "MS_THUE", "DIEN_THOAI_NLH", "NGAY_TANG",
             "CHUYEN_QUAN_THU", "DIEN_THOAI_CQT"
         ])
 

@@ -11,31 +11,25 @@ app, rt = fast_app(pico=True)
 EXCEL_FILE = "danh_sach_don_vi.xlsx"
 
 # 2. Hàm lấy thời gian cập nhật file Excel gần nhất
+import openpyxl
+from datetime import timedelta
+
 def get_file_update_time():
     try:
-        # Lấy ngày commit cuối cùng của riêng file danh_sach_don_vi.xlsx từ Git
-        result = subprocess.check_output(
-            ["git", "log", "-1", "--format=%ct", EXCEL_FILE],
-            stderr=subprocess.DEVNULL
-        ).decode("utf-8").strip()
-        
-        if result:
-            timestamp = int(result)
-            # Chuyển từ Timestamp sang múi giờ Việt Nam (UTC+7)
-            utc_time = datetime.utcfromtimestamp(timestamp)
-            vn_time = utc_time + timedelta(hours=7)
-            return vn_time.strftime("%d/%m/%Y %H:%M")
-    except Exception as e:
-        print(f"Lỗi lấy lịch sử Git: {e}")
-    
-    # Trường hợp dự phòng nếu không đọc được từ Git
-    try:
         if os.path.exists(EXCEL_FILE):
-            mtime = os.path.getmtime(EXCEL_FILE)
-            utc_time = datetime.utcfromtimestamp(mtime)
-            return (utc_time + timedelta(hours=7)).strftime("%d/%m/%Y %H:%M")
-    except:
-        pass
+            wb = openpyxl.load_workbook(EXCEL_FILE, read_only=True)
+            props = wb.properties
+            mod_time = props.modified or props.created
+            wb.close()  # Đóng file ngay sau khi lấy thông tin
+            
+            if mod_time:
+                if mod_time.tzinfo is None:
+                    vn_time = mod_time + timedelta(hours=7)
+                else:
+                    vn_time = mod_time.astimezone()
+                return vn_time.strftime("%d/%m/%Y %H:%M")
+    except Exception as e:
+        print(f"Lỗi đọc metadata Excel: {e}")
         
     return "Chưa xác định"
 

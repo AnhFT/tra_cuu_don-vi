@@ -1,13 +1,26 @@
 from fasthtml.common import *
 import pandas as pd
+import os
+from datetime import datetime
 
-# 1. Khởi tạo app (Bắt buộc phải gán biến app)
+# 1. Khởi tạo ứng dụng FastHTML với Pico CSS
 app, rt = fast_app(pico=True)
 
 EXCEL_FILE = "danh_sach_don_vi.xlsx"
 
+# 2. Hàm lấy thời gian cập nhật file Excel gần nhất
+def get_file_update_time():
+    try:
+        if os.path.exists(EXCEL_FILE):
+            mtime = os.path.getmtime(EXCEL_FILE)
+            # Định dạng ngày/giờ kiểu Việt Nam: DD/MM/YYYY - HH:MM
+            return datetime.fromtimestamp(mtime).strftime("%d/%m/%Y %H:%M")
+    except Exception as e:
+        print(f"Lỗi lấy ngày cập nhật: {e}")
+    return "Chưa xác định"
+
+# 3. Hàm làm sạch số điện thoại và mã số thuế
 def clean_phone(val):
-    """Hàm làm sạch số điện thoại: xóa .0 và thêm số 0 ở đầu nếu bị mất"""
     val = str(val).strip()
     if val.endswith('.0'):
         val = val[:-2]
@@ -15,13 +28,12 @@ def clean_phone(val):
         val = '0' + val
     return "" if val == "nan" else val
 
+# 4. Hàm đọc dữ liệu từ Excel
 def load_data():
     try:
-        # Ép đọc toàn bộ dữ liệu Excel dưới dạng chuỗi (String)
         df = pd.read_excel(EXCEL_FILE, dtype=str)
         df = df.fillna("")
         
-        # Làm sạch riêng cho các cột Số điện thoại và Mã số thuế
         phone_cols = ['DIEN_THOAI_NLH', 'DIEN_THOAI_CQT', 'MS_THUE']
         for col in phone_cols:
             if col in df.columns:
@@ -31,13 +43,15 @@ def load_data():
     except Exception as e:
         print(f"Lỗi đọc file Excel: {e}")
         return pd.DataFrame(columns=[
-            "MA_DONVI", "TEN_DONVI", "DC_LIEN_HE",
-            "MS_THUE", "DIEN_THOAI_NLH", "NGAY_TANG",
+            "MA_DONVI", "TEN_DONVI", "DC_LIEN_HE", 
+            "MS_THUE", "DIEN_THOAI_NLH", "NGAY_TANG", 
             "CHUYEN_QUAN_THU", "DIEN_THOAI_CQT"
         ])
 
 df = load_data()
+LAST_UPDATE = get_file_update_time()
 
+# 5. Hàm render bảng kết quả
 def render_results(results):
     if results.empty:
         return Article(P("⚠️ Không tìm thấy kết quả phù hợp.", style="color: orange;"))
@@ -79,13 +93,22 @@ def render_results(results):
         )
     )
 
+# 6. Giao diện trang chủ (GET /)
 @rt("/")
 def get():
     return Titled(
         "🔍 Tra cứu thông tin đơn vị",
         Main(
             Article(
-                H3("Nhập thông tin cần tìm"),
+                # Thẻ Div sắp xếp Tiêu đề bên trái và Ngày update căn lề bên phải
+                Div(
+                    H3("Nhập thông tin cần tìm", style="margin-bottom: 0;"),
+                    Small(
+                        f"📅 Dữ liệu cập nhật: {LAST_UPDATE}", 
+                        style="color: #666; font-style: italic; white-space: nowrap;"
+                    ),
+                    style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 15px;"
+                ),
                 P("Tìm theo Mã đơn vị, Tên, Địa chỉ, MST, SĐT, Chuyên quản hoặc SĐT CQT:"),
                 Input(
                     type="search",
@@ -101,6 +124,7 @@ def get():
         )
     )
 
+# 7. Xử lý tìm kiếm (POST /search)
 @rt("/search")
 def post(query: str):
     query_str = query.strip().lower()

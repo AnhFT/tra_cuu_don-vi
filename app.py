@@ -1,3 +1,4 @@
+import subprocess
 from datetime import datetime, timedelta
 from fasthtml.common import *
 import pandas as pd
@@ -12,14 +13,30 @@ EXCEL_FILE = "danh_sach_don_vi.xlsx"
 # 2. Hàm lấy thời gian cập nhật file Excel gần nhất
 def get_file_update_time():
     try:
-        if os.path.exists(EXCEL_FILE):
-            mtime = os.path.getmtime(EXCEL_FILE)
-            # Lấy thời gian UTC từ server và cộng thêm 7 giờ cho múi giờ Việt Nam
-            utc_time = datetime.utcfromtimestamp(mtime)
+        # Lấy ngày commit cuối cùng của riêng file danh_sach_don_vi.xlsx từ Git
+        result = subprocess.check_output(
+            ["git", "log", "-1", "--format=%ct", EXCEL_FILE],
+            stderr=subprocess.DEVNULL
+        ).decode("utf-8").strip()
+        
+        if result:
+            timestamp = int(result)
+            # Chuyển từ Timestamp sang múi giờ Việt Nam (UTC+7)
+            utc_time = datetime.utcfromtimestamp(timestamp)
             vn_time = utc_time + timedelta(hours=7)
             return vn_time.strftime("%d/%m/%Y %H:%M")
     except Exception as e:
-        print(f"Lỗi lấy ngày cập nhật: {e}")
+        print(f"Lỗi lấy lịch sử Git: {e}")
+    
+    # Trường hợp dự phòng nếu không đọc được từ Git
+    try:
+        if os.path.exists(EXCEL_FILE):
+            mtime = os.path.getmtime(EXCEL_FILE)
+            utc_time = datetime.utcfromtimestamp(mtime)
+            return (utc_time + timedelta(hours=7)).strftime("%d/%m/%Y %H:%M")
+    except:
+        pass
+        
     return "Chưa xác định"
 
 # 3. Hàm làm sạch số điện thoại và mã số thuế

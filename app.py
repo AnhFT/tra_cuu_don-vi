@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta
 from fasthtml.common import *
 import pandas as pd
 import os
@@ -13,8 +14,10 @@ def get_file_update_time():
     try:
         if os.path.exists(EXCEL_FILE):
             mtime = os.path.getmtime(EXCEL_FILE)
-            # Định dạng ngày/giờ kiểu Việt Nam: DD/MM/YYYY - HH:MM
-            return datetime.fromtimestamp(mtime).strftime("%d/%m/%Y %H:%M")
+            # Lấy thời gian UTC từ server và cộng thêm 7 giờ cho múi giờ Việt Nam
+            utc_time = datetime.utcfromtimestamp(mtime)
+            vn_time = utc_time + timedelta(hours=7)
+            return vn_time.strftime("%d/%m/%Y %H:%M")
     except Exception as e:
         print(f"Lỗi lấy ngày cập nhật: {e}")
     return "Chưa xác định"
